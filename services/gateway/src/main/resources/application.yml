@@ -1,6 +1,11 @@
 spring:
   application:
     name: gateway
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://auth-server:7080/realms/shop-realm
   cloud:
     gateway:
       discovery:
@@ -12,6 +17,10 @@ spring:
           uri: lb:http://PRODUCT-SERVICE
           predicates:
             - Path=/api/v1/products/**
+        - id: order-service
+          uri: lb:http://ORDER-SERVICE
+          predicates:
+            - Path=/api/v1/orders/**
 eureka:
   client:
     service-url:

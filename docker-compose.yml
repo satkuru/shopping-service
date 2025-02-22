@@ -1,4 +1,25 @@
 services:
+  auth-server:
+    image: quay.io/keycloak/keycloak:24.0.2
+    ports:
+      - "9098:8080"
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_PROXY: edge
+    restart: always
+    volumes:
+      - keycloak:/opt/jboss/keycloak/standalone/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7080/health/ready"]
+      interval: 15s
+      timeout: 2s
+      retries: 15
+    command: ["start-dev", "--http-port", "8080", "--https-port", "7443"]
+    networks:
+      - shopping-network
+    hostname: auth-server
+
   eureka-server:
     build: services/eureka-server/.
     container_name: eureka-server
@@ -6,6 +27,12 @@ services:
       - "8761:8761"
     networks:
       - shopping-network
+    hostname: eureka-server
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://eureka-server:8761/actuator/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   gateway:
     build: services/gateway/.
@@ -15,9 +42,11 @@ services:
     networks:
       - shopping-network
     depends_on:
-      - eureka-server
+      eureka-server:
+        condition: service_healthy
     environment:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    hostname: gateway
 
   product-service:
     build: services/product-service/.
@@ -31,7 +60,25 @@ services:
       - gateway
     environment:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    hostname: product-service
+
+  order-service:
+    build: services/order-service/.
+    container_name: order-service
+    ports:
+      - "8082:8082"
+    networks:
+      - shopping-network
+    depends_on:
+      - eureka-server
+      - gateway
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    hostname: order-service
 
 networks:
   shopping-network:
     driver: bridge
+
+volumes:
+  keycloak:
